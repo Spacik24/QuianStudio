@@ -5,12 +5,256 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QuianStudio</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f4f4f9; }
-        h1 { color: #333; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        /* Верхняя панель */
+        .top-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .studio-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .social-links {
+            display: flex;
+            gap: 15px;
+        }
+
+        .social-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            color: white;
+            font-size: 20px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .social-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .youtube { background: #FF0000; }
+        .telegram { background: #0088cc; }
+        .tiktok { background: #000000; }
+
+        /* Основной контент */
+        .content {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+            text-align: center;
+        }
+
+        .welcome-text {
+            font-size: 18px;
+            line-height: 1.6;
+            margin-bottom: 40px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        /* Галерея */
+        .gallery-section {
+            margin-top: 50px;
+        }
+
+        .gallery-title {
+            font-size: 28px;
+            margin-bottom: 30px;
+            color: #667eea;
+        }
+
+        .gallery-container {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .gallery {
+            display: flex;
+            transition: transform 0.5s ease;
+        }
+
+        .gallery-item {
+            min-width: 100%;
+            height: 400px;
+        }
+
+        .gallery-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.9);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .gallery-nav:hover {
+            background: white;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .prev { left: 10px; }
+        .next { right: 10px; }
+
+        .gallery-counter {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 600px) {
+            .top-bar {
+                flex-direction: column;
+                gap: 15px;
+                padding: 15px;
+            }
+            
+            .studio-name {
+                font-size: 20px;
+            }
+            
+            .gallery-item {
+                height: 300px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>QuianStudio</h1>
-    <p>Привет, я инди-разработчик. На этом сайте можете получить ссылки на мои актуальные соцсети и на мои проекты где я участвую!</p>
+    <!-- Верхняя панель -->
+    <div class="top-bar">
+        <div class="studio-name">QuianStudio</div>
+        <div class="social-links">
+            <!-- Замени # на свои ссылки -->
+            <a href="https://youtube.com/yourchannel" target="_blank" class="social-btn youtube" title="YouTube">▶</a>
+            <a href="https://t.me/yourusername" target="_blank" class="social-btn telegram" title="Telegram"></a>
+            <a href="https://tiktok.com/@yourusername" target="_blank" class="social-btn tiktok" title="TikTok">♬</a>
+        </div>
+    </div>
+
+    <!-- Основной контент -->
+    <div class="content">
+        <div class="welcome-text">
+            <p>Привет, я инди-разработчик. На этом сайте можете получить ссылки на мои актуальные соцсети и на мои проекты где я участвую!</p>
+        </div>
+
+        <!-- Галерея -->
+        <div class="gallery-section">
+            <h2 class="gallery-title">Мои проекты</h2>
+            <div class="gallery-container">
+                <button class="gallery-nav prev" onclick="changeSlide(-1)">❮</button>
+                <div class="gallery" id="gallery">
+                    <!-- Добавляй свои фото здесь -->
+                    <div class="gallery-item">
+                        <img src="https://via.placeholder.com/600x400/667eea/ffffff?text=Project+1" alt="Project 1">
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://via.placeholder.com/600x400/764ba2/ffffff?text=Project+2" alt="Project 2">
+                    </div>
+                    <div class="gallery-item">
+                        <img src="https://via.placeholder.com/600x400/f093fb/ffffff?text=Project+3" alt="Project 3">
+                    </div>
+                    <!-- Копируй блок gallery-item чтобы добавить больше фото -->
+                </div>
+                <button class="gallery-nav next" onclick="changeSlide(1)">❯</button>
+            </div>
+            <div class="gallery-counter">
+                <span id="current">1</span> из <span id="total">3</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentIndex = 0;
+        const gallery = document.getElementById('gallery');
+        const items = gallery.getElementsByClassName('gallery-item');
+        const total = items.length;
+
+        // Обновление счётчика
+        document.getElementById('total').textContent = total;
+
+        function changeSlide(direction) {
+            currentIndex += direction;
+            
+            // Циклическая прокрутка
+            if (currentIndex < 0) {
+                currentIndex = total - 1;
+            } else if (currentIndex >= total) {
+                currentIndex = 0;
+            }
+            
+            // Сдвиг галереи
+            gallery.style.transform = `translateX(-${currentIndex * 100}%)`;
+            document.getElementById('current').textContent = currentIndex + 1;
+        }
+
+        // Автопрокрутка (опционально, раскомментируй если нужно)
+        // setInterval(() => changeSlide(1), 5000);
+
+        // Управление свайпом на мобильных
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        gallery.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        gallery.addEventListener('touchend', e => {
+            touchEndX = e.changedTouches[0].screenX;
+            if (touchStartX - touchEndX > 50) {
+                changeSlide(1);
+            } else if (touchEndX - touchStartX > 50) {
+                changeSlide(-1);
+            }
+        });
+    </script>
 </body>
 </html>
