@@ -1,2 +1,2 @@
-# QuianStudio-Site
+# QuianStudio
 My site
