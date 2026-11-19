@@ -1,0 +1,150 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Острова — RTS</title><meta name="color-scheme" content="light dark">
+<style>
+:root{--bg:#f3f5f8;--fg:#14202e;--card:#fff;--bd:#c9d2dd;--ac:#1d6fb8;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f1720;--fg:#e6edf5;--card:#1a2431;--bd:#33445a;--ac:#4aa3ee}}
+:root[data-theme=dark]{--bg:#0f1720;--fg:#e6edf5;--card:#1a2431;--bd:#33445a;--ac:#4aa3ee}
+html,body{height:100%;margin:0}body{background:var(--bg);color:var(--fg);font:15px system-ui,sans-serif}
+button,input,select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 10px}
+button{background:var(--ac);color:#fff;border:0;margin:3px 3px 0 0;white-space:pre-line;text-align:left}button:disabled{opacity:.45}
+button.g{background:var(--card);color:var(--fg);border:1px solid var(--bd)}
+#lob{max-width:460px;margin:0 auto;padding:16px}#lob>*{margin:8px 0}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=color]{padding:0;width:44px;height:36px}.pl{display:flex;gap:8px;align-items:center;padding:4px 0}
+#game{display:none;height:100%;flex-direction:column}#top{padding:6px 8px;background:var(--card);border-bottom:1px solid var(--bd);display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:14px}
+#map{flex:0 0 52%;overflow:auto;background:#256aa3}canvas{display:block}#pn{flex:1;overflow:auto;padding:8px}
+.sm{font-size:13px;opacity:.8}.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:8px}
+</style></head><body>
+<div id="lob"><h1>🏝 Острова</h1><div id="boot" class="sm">Подключение…</div>
+<input id="nm" placeholder="Название страны" maxlength="20">
+<div class="row">Флаг: <input type="color" id="c1" value="#d32f2f"><input type="color" id="c2" value="#ffffff"><select id="pt"><option value="0">Полоса</option><option value="1">Вертикаль</option><option value="2">Крест</option><option value="3">Круг</option></select><canvas id="fp" width="48" height="32"></canvas></div>
+<div id="btns"></div><div id="pls"></div></div>
+<div id="game"><div id="top"></div><div id="map"><canvas id="cv"></canvas></div><div id="pn"></div></div>
+<script>
+const N=64,T=14,$=s=>document.querySelector(s);
+const RES={wood:['Дерево','#2e7d32','🌲'],iron:['Железо','','⛏'],oil:['Нефть','','🛢'],magic:['Магия','','✨'],uran:['Уран','','☢'],pop:['Люди','','👥']};
+const BN={city:'🏰 Колония/город',barracks:'⚔ Казарма',farm:'🌾 Колхоз',port:'⚓ Порт',mine:'⛏ Добыча'};
+const MN={wood:'🪚 Лесопилка',iron:'⛏ Шахта',uran:'☢ Урановая шахта',magic:'✨ Маг-шахта',oil:'🛢 Нефтевышка'};
+const COST={city:{wood:10,iron:10},barracks:{wood:8,iron:2},farm:{wood:5},port:{wood:10},mine:{wood:5}};
+const REC={inf:{n:'Пехота',s:1,c:{pop:5,iron:3}},tank:{n:'Танки (×2)',s:2,c:{pop:5,iron:3,oil:2}},mage:{n:'Маги (×3)',s:3,c:{pop:5,magic:2}}};
+const SHIPC={wood:10,iron:5};
+let db,col,uid,lobby,P={},C={},ids=[],st,world,wseed,sel,host=false,timer,base,scrolled,seq=0;
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const nb=(x,y)=>{const o=[];for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const a=x+dx,b=y+dy;if((dx||dy)&&a>=0&&b>=0&&a<N&&b<N)o.push([a,b])}return o};
+function gen(seed){const r=rng(seed),ly=[6,12,24].map(g=>{const a=[];for(let i=0;i<=g;i++){a.push([]);for(let j=0;j<=g;j++)a[i].push(r())}return{g,a}});
+const L=new Uint8Array(N*N),H=[],R=[],W=[.5,.3,.2],sm=p=>p*p*(3-2*p);
+for(let y=0;y<N;y++)for(let x=0;x<N;x++){let v=0;ly.forEach((l,k)=>{const fx=x/N*l.g,fy=y/N*l.g,i=fx|0,j=fy|0,u=sm(fx-i),q=sm(fy-j),a=l.a;v+=W[k]*((a[i][j]*(1-u)+a[i+1][j]*u)*(1-q)+(a[i][j+1]*(1-u)+a[i+1][j+1]*u)*q)});
+const k=y*N+x;H[k]=v;L[k]=v>.55&&x>1&&y>1&&x<N-2&&y<N-2?1:0}
+const tp=[['wood',40],['iron',25],['oil',14],['magic',11],['uran',10]];
+for(let k=0;k<N*N;k++){R[k]=null;if(L[k]&&r()<.05){let q=r()*100;for(const[t,w]of tp){if((q-=w)<0){R[k]=t;break}}}}
+return{L,H,R}}
+const isLand=(x,y)=>x>=0&&y>=0&&x<N&&y<N&&world.L[y*N+x]==1;
+const dist=(a,b)=>Math.max(Math.abs(a.x-b.x),Math.abs(a.y-b.y));
+function bfs(sx,sy,goal,pass){const pr=new Int16Array(N*N).fill(-2),q=[sy*N+sx];pr[q[0]]=-1;
+for(let h=0;h<q.length;h++){const k=q[h],x=k%N,y=k/N|0;if(goal(x,y)){const p=[];let c=k;while(pr[c]>=0){p.unshift([c%N,c/N|0]);c=pr[c]}return p}
+for(const[a,b]of nb(x,y)){const n=b*N+a;if(pr[n]==-2&&pass(a,b)){pr[n]=k;q.push(n)}}}return null}
+function spawns(n){const comp=new Int16Array(N*N),size=[0];let c=0;
+for(let k=0;k<N*N;k++)if(world.L[k]&&!comp[k]){c++;let s=0;const q=[k];comp[k]=c;for(let h=0;h<q.length;h++){s++;const x=q[h]%N,y=q[h]/N|0;for(const[a,b]of nb(x,y)){const m=b*N+a;if(world.L[m]&&!comp[m]){comp[m]=c;q.push(m)}}}size[c]=s}
+let cand=[];for(let k=0;k<N*N;k++)if(world.L[k]&&size[comp[k]]>=25&&!world.R[k])cand.push([k%N,k/N|0]);
+if(cand.length<n)for(let k=0;k<N*N;k++)if(world.L[k])cand.push([k%N,k/N|0]);
+const out=[cand[(cand.length/2)|0]];while(out.length<n){let best,bd=-1;for(const p of cand){const d=Math.min(...out.map(o=>Math.hypot(o[0]-p[0],o[1]-p[1])));if(d>bd){bd=d;best=p}}out.push(best)}return out}
+function flag(cv,c){const g=cv.getContext('2d'),w=cv.width,h=cv.height;g.fillStyle=c[0];g.fillRect(0,0,w,h);g.fillStyle=c[1];const t=+c[2];
+if(t==0)g.fillRect(0,h*.35,w,h*.3);if(t==1)g.fillRect(w*.35,0,w*.3,h);if(t==2){g.fillRect(0,h*.4,w,h*.2);g.fillRect(w*.3,0,w*.2,h)}if(t==3){g.beginPath();g.arc(w/2,h/2,h*.3,0,7);g.fill()}}
+function fl(c,w=30,h=20){const e=document.createElement('canvas');e.width=w;e.height=h;flag(e,c);e.style.cssText='border:1px solid #0006;border-radius:3px;flex:none';return e}
+function pre(){flag($('#fp'),[$('#c1').value,$('#c2').value,$('#pt').value])}
+['c1','c2','pt'].forEach(i=>$('#'+i).oninput=pre);pre();
+const bAt=(x,y)=>st.b.find(b=>b.x==x&&b.y==y);
+const afford=(p,c)=>Object.entries(c).every(([k,v])=>(p[k]||0)>=v),pay=(p,c)=>{for(const k in c)p[k]-=c[k]};
+function can(k,x,y,u){const p=st.pl[u];if(!isLand(x,y))return'нужна суша';if(bAt(x,y))return'занято';
+if(k=='mine'&&!world.R[y*N+x])return'нет ресурса';
+if(k=='port'&&!nb(x,y).some(([a,b])=>!isLand(a,b)))return'нужно побережье';
+if(k=='city'){if(!st.a.some(a=>a.o==u&&a.x==x&&a.y==y))return'нужна армия здесь'}
+else if(!st.b.some(b=>b.o==u&&b.t=='city'&&dist(b,{x,y})<=5))return'далеко от города';
+return afford(p,COST[k])?'':'не хватает ресурсов'}
+function land(s,t){st.a.push({id:st.nid++,o:s.o,x:t[0],y:t[1],n:s.c.n,s:s.c.s,p:[]});s.c=null;s.l=null}
+function apply(u,c){const p=st.pl[u];
+if(c.t=='build'){if(!can(c.k,c.x,c.y,u)){pay(p,COST[c.k]);st.b.push({id:st.nid++,t:c.k,x:c.x,y:c.y,o:u})}}
+else if(c.t=='rec'){const b=st.b.find(b=>b.id==c.id&&b.o==u&&b.t=='barracks'),r=REC[c.k];if(b&&r&&afford(p,r.c)){pay(p,r.c);st.a.push({id:st.nid++,o:u,x:b.x,y:b.y,n:5,s:r.s,p:[]})}}
+else if(c.t=='ship'){const b=st.b.find(b=>b.id==c.id&&b.o==u&&b.t=='port'),w=b&&nb(b.x,b.y).find(([x,y])=>!isLand(x,y));if(w&&afford(p,SHIPC)){pay(p,SHIPC);st.s.push({id:st.nid++,o:u,x:w[0],y:w[1],p:[],c:null,l:null})}}
+else if(c.t=='move'){const e=(c.k=='army'?st.a:st.s).find(e=>e.id==c.id&&e.o==u);if(!e)return;
+if(c.k=='army'){if(isLand(c.x,c.y))e.p=bfs(e.x,e.y,(x,y)=>x==c.x&&y==c.y,isLand)||[]}
+else{const tl=isLand(c.x,c.y),g=tl?(x,y)=>Math.max(Math.abs(x-c.x),Math.abs(y-c.y))<=1&&!isLand(x,y):(x,y)=>x==c.x&&y==c.y;e.p=bfs(e.x,e.y,g,(x,y)=>!isLand(x,y))||[];e.l=tl&&e.c?[c.x,c.y]:null}}
+else if(c.t=='board'){const s=st.s.find(s=>s.id==c.id&&s.o==u);if(!s)return;st.a.filter(a=>a.o==u&&dist(a,s)<=2&&(!s.c||s.c.s==a.s)).forEach(a=>{const cap=30-(s.c?s.c.n:0),t=Math.min(cap,a.n);if(t<=0)return;s.c=s.c||{n:0,s:a.s};s.c.n+=t;a.n-=t});st.a=st.a.filter(a=>a.n>0)}
+else if(c.t=='unload'){const s=st.s.find(s=>s.id==c.id&&s.o==u&&s.c),t=s&&nb(s.x,s.y).find(([x,y])=>isLand(x,y));if(t)land(s,t)}
+else if(c.t=='war'){if(st.pl[c.p]&&c.p!=u){p.war[c.p]=1;st.pl[c.p].war[u]=1}}
+else if(c.t=='nuke'){if(p.uran>=5&&Object.keys(p.war).length){p.uran-=5;const f=e=>!(e.o!=u&&p.war[e.o]&&dist(e,c)<=2);st.a=st.a.filter(f);st.b=st.b.filter(f);st.s=st.s.filter(f)}}}
+function tick(){st.t++;
+st.s.forEach(s=>{for(let k=0;k<2&&s.p.length;k++){const q=s.p.shift();s.x=q[0];s.y=q[1]}if(!s.p.length&&s.l&&s.c)land(s,s.l)});
+st.a.forEach(a=>{if(a.p.length){const q=a.p.shift();a.x=q[0];a.y=q[1]}});
+const by={};st.a.forEach(a=>(by[a.y*N+a.x]=by[a.y*N+a.x]||[]).push(a));
+for(const k in by){const g=by[k];for(let i=0;i<g.length;i++)for(let j=i+1;j<g.length;j++){const a=g[i],b=g[j];if(a.o==b.o||!st.pl[a.o].war[b.o]||a.n<=0||b.n<=0)continue;const pa=a.n*a.s,pb=b.n*b.s,d=Math.min(pa,pb);a.n=Math.floor((pa-d)/a.s);b.n=Math.floor((pb-d)/b.s)}}
+st.a=st.a.filter(a=>a.n>0);
+st.b.forEach(b=>{const a=st.a.find(a=>a.x==b.x&&a.y==b.y&&a.o!=b.o&&st.pl[a.o].war[b.o]);if(a&&!st.a.some(e=>e.x==b.x&&e.y==b.y&&e.o==b.o))b.o=a.o});
+for(let i=0;i<st.a.length;i++)for(let j=i+1;j<st.a.length;j++){const a=st.a[i],b=st.a[j];if(a.o==b.o&&a.x==b.x&&a.y==b.y&&a.s==b.s&&!a.p.length&&!b.p.length){a.n+=b.n;b.n=0}}
+st.a=st.a.filter(a=>a.n>0);
+if(st.t%6==0)st.b.forEach(b=>{const p=st.pl[b.o];if(b.t=='city')p.pop+=7;if(b.t=='farm')p.pop+=3;if(b.t=='mine'){const r=world.R[b.y*N+b.x];if(r)p[r]+=3}});
+const alive=Object.keys(st.pl).filter(u=>st.b.some(b=>b.o==u&&b.t=='city'));if(alive.length<=1&&Object.keys(st.pl).length>1)st.win=alive[0]||'-'}
+function hostTick(){if(!st||st.win&&st.wsent)return;
+for(const u in C)for(const c of C[u].list||[])if(c.i>(st.done[u]||0)){st.done[u]=c.i;if(st.pl[u])apply(u,c)}
+if(!st.win)tick();else st.wsent=1;col.doc('state').set({s:JSON.stringify(st)}).catch(()=>{});render()}
+function send(c){if(host){apply(uid,c);render();return}
+const l=((C[uid]||{}).list||[]).slice(-12);l.push({...c,i:Date.now()*100+(seq++%100)});C[uid]={list:l};col.doc('cmd_'+uid).set({list:l})}
+async function start(){world=gen(lobby.seed);wseed=lobby.seed;base=null;const us=Object.keys(P),sp=spawns(us.length);
+st={t:0,nid:1,pl:{},b:[],a:[],s:[],done:{}};us.forEach((u,i)=>{st.pl[u]={...P[u],wood:40,iron:20,oil:0,magic:0,uran:0,pop:20,war:{}};st.b.push({id:st.nid++,t:'city',x:sp[i][0],y:sp[i][1],o:u})});
+await col.doc('state').set({s:JSON.stringify(st)});await col.doc('lobby').update({status:'run'})}
+async function create(){for(const i of ids)if(i!='lobby')await col.doc(i).delete().catch(()=>{});st=null;scrolled=0;
+await col.doc('lobby').set({host:uid,status:'wait',seed:(Math.random()*1e9)|0});join()}
+function join(){col.doc('p_'+uid).set({n:$('#nm').value.trim()||'Страна '+Math.floor(Math.random()*99),c:[$('#c1').value,$('#c2').value,$('#pt').value]})}
+function onSnap(s){P={};C={};lobby=null;ids=[];let sd=null;
+s.docs.forEach(d=>{const x=d.data(),i=d.id;ids.push(i);if(i=='lobby')lobby=x;else if(i=='state')sd=x;else if(i.startsWith('p_'))P[i.slice(2)]=x;else if(i.startsWith('cmd_'))C[i.slice(4)]=x});
+host=!!lobby&&lobby.host==uid;
+if(lobby&&lobby.status=='run'&&sd&&sd.s){if(!host||!st)st=JSON.parse(sd.s);if(!world||wseed!=lobby.seed){world=gen(lobby.seed);wseed=lobby.seed;base=null}
+if(host&&!timer)timer=setInterval(hostTick,1000)}
+if(lobby&&lobby.status=='wait'){st=null;world=null}
+view()}
+function view(){const run=lobby&&lobby.status=='run'&&P[uid]&&st&&world;$('#lob').style.display=run?'none':'block';$('#game').style.display=run?'flex':'none';
+if(run)return render();
+const b=$('#btns');b.innerHTML='';const B=(t,f,g)=>{const e=document.createElement('button');e.textContent=t;e.onclick=f;if(g)e.className='g';b.append(e)};
+if(!lobby)B('Создать игру',create);else{if(!P[uid]&&lobby.status=='wait')B('Войти в игру',join);if(lobby.status=='run'&&!P[uid])b.append('Игра уже идёт.');
+if(host){if(lobby.status=='wait')B('▶ Старт',start);B('Новая игра',create,1)}else if(lobby.status=='wait')b.append(P[uid]?' Ждём старта от хоста…':'')}
+if(lobby&&!host)b.append(lobby.status=='run'&&P[uid]?' Загрузка карты…':'');
+const pl=$('#pls');pl.innerHTML=lobby?'<b>Игроки:</b>':'';for(const u in P){const d=document.createElement('div');d.className='pl';d.append(fl(P[u].c),P[u].n+(u==uid?' (вы)':'')+(lobby&&lobby.host==u?' ★':''));pl.append(d)}}
+function mk(){base=document.createElement('canvas');base.width=base.height=N*T;const g=base.getContext('2d'),{L,H,R}=world;g.font='11px sans-serif';g.textAlign='center';g.textBaseline='middle';
+for(let y=0;y<N;y++)for(let x=0;x<N;x++){const k=y*N+x;g.fillStyle=L[k]?(H[k]>.68?'#8d8470':H[k]>.62?'#6f9a4a':'#5d8f3e'):nb(x,y).some(([a,b])=>L[b*N+a])?'#3f8fc6':'#256aa3';g.fillRect(x*T,y*T,T,T);if(R[k])g.fillText(RES[R[k]][2],x*T+T/2,y*T+T/2+1)}}
+const selE=()=>sel&&sel.k!='tile'?(sel.k=='army'?st.a:st.s).find(e=>e.id==sel.id):null;
+function render(){if(!st||!world)return;if(!base)mk();const cv=$('#cv');cv.width=cv.height=N*T;const g=cv.getContext('2d');g.drawImage(base,0,0);g.textAlign='center';g.textBaseline='middle';
+const col=o=>st.pl[o].c[0];
+st.b.forEach(b=>{g.fillStyle=col(b.o);g.globalAlpha=.85;g.fillRect(b.x*T+1,b.y*T+1,T-2,T-2);g.globalAlpha=1;g.font='10px sans-serif';g.fillStyle='#000';g.fillText(b.t=='mine'?RES[world.R[b.y*N+b.x]][2]:BN[b.t].split(' ')[0],b.x*T+T/2,b.y*T+T/2+1)});
+const e=selE();if(e){g.strokeStyle='#ff0';g.lineWidth=1.5;g.beginPath();g.moveTo(e.x*T+T/2,e.y*T+T/2);e.p.forEach(q=>g.lineTo(q[0]*T+T/2,q[1]*T+T/2));g.stroke();g.strokeRect(e.x*T,e.y*T,T,T)}
+else if(sel){g.strokeStyle='#ff0';g.lineWidth=2;g.strokeRect(sel.x*T,sel.y*T,T,T)}
+st.s.forEach(s=>{g.fillStyle=col(s.o);g.strokeStyle='#000';g.beginPath();g.moveTo(s.x*T+T/2,s.y*T);g.lineTo(s.x*T+T,s.y*T+T);g.lineTo(s.x*T,s.y*T+T);g.closePath();g.fill();g.stroke()});
+st.a.forEach(a=>{g.fillStyle=col(a.o);g.strokeStyle='#000';g.lineWidth=1;g.beginPath();g.arc(a.x*T+T-4,a.y*T+4,5,0,7);g.fill();g.stroke();g.fillStyle='#fff';g.font='bold 7px sans-serif';g.fillText(a.n,a.x*T+T-4,a.y*T+4.5)});
+if(!scrolled){scrolled=1;const c=st.b.find(b=>b.o==uid);if(c){$('#map').scrollLeft=c.x*T-$('#map').clientWidth/2;$('#map').scrollTop=c.y*T-$('#map').clientHeight/2}}
+panel()}
+$('#cv').onclick=ev=>{if(!st)return;const x=ev.offsetX/T|0,y=ev.offsetY/T|0,A=st.a.find(a=>a.x==x&&a.y==y&&a.o==uid),S=st.s.find(s=>s.x==x&&s.y==y&&s.o==uid);
+if(A)sel={k:'army',id:A.id};else if(S)sel={k:'ship',id:S.id};else if(selE())send({t:'move',k:sel.k,id:sel.id,x,y});else sel={k:'tile',x,y};render()};
+function panel(){const p=st.pl[uid],pn=$('#pn');pn.innerHTML='';
+$('#top').innerHTML='';$('#top').append(fl(p.c),p.n,'Неделя '+Math.floor(st.t/6));
+['wood','iron','oil','magic','uran','pop'].forEach(r=>$('#top').append(RES[r][2]+(p[r]||0)));
+const B=(t,f,dis,g)=>{const b=document.createElement('button');b.textContent=t;b.disabled=!!dis;b.onclick=f;if(g)b.className='g';pn.append(b);return b};
+const T_=h=>{const d=document.createElement('div');d.className='card';d.textContent=h;pn.append(d)};
+const cost=c=>Object.entries(c).map(([k,v])=>v+RES[k][2]).join(' ');
+if(st.win)T_(st.win=='-'?'Игра окончена.':'🏆 Победитель: '+st.pl[st.win].n);
+const e=selE();
+if(!sel||!e&&sel.k!='tile'){T_('Тапните клетку карты. Свою армию/корабль — чтобы выбрать, затем тапните цель.')}
+else if(e){const army=sel.k=='army';
+T_(army?`Армия: ${e.n} чел., сила ×${e.s}. Тапните цель на суше.`:`Корабль${e.c?': на борту '+e.c.n+' чел.':' пуст'}. Тапните воду/берег. Если на борту армия и цель — берег, она высадится сама.`);
+if(army){const er=can('city',e.x,e.y,uid);B('🏰 Основать колонию здесь ('+cost(COST.city)+')'+(er?'\n'+er:''),()=>send({t:'build',k:'city',x:e.x,y:e.y}),er)}
+else{B('⬆ Погрузить армии рядом (≤2 клетки)',()=>send({t:'board',id:e.id}));B('⬇ Высадить на берег',()=>send({t:'unload',id:e.id}),!e.c)}
+B('Отмена',()=>{sel={k:'tile',x:e.x,y:e.y};render()},0,1)}
+else{const{x,y}=sel,r=world.R[y*N+x],b=bAt(x,y);
+T_(`Клетка ${x},${y}: ${isLand(x,y)?'суша':'океан'}${r?' · '+RES[r][0]:''}${b?' · '+BN[b.t]+' ('+st.pl[b.o].n+')':''}`);
+if(isLand(x,y)&&!b)for(const k in BN){if(k=='mine'&&!r)continue;const er=can(k,x,y,uid);B((k=='mine'?MN[r]:BN[k])+' ('+cost(COST[k])+')'+(er?'\n'+er:''),()=>send({t:'build',k,x,y}),er)}
+if(b&&b.o==uid&&b.t=='barracks')for(const k in REC)B(`Нанять: ${REC[k].n} ×5 (${cost(REC[k].c)})`,()=>send({t:'rec',id:b.id,k}),!afford(p,REC[k].c));
+if(b&&b.o==uid&&b.t=='port')B('⛵ Построить корабль ('+cost(SHIPC)+')',()=>send({t:'ship',id:b.id}),!afford(p,SHIPC));
+B('☢ Ядерный удар (5☢, радиус 2, только по врагам)',()=>send({t:'nuke',x,y}),p.uran<5||!Object.keys(p.war).length)}
+const h=document.createElement('div');h.innerHTML='<b>Страны</b>';h.style.marginTop='10px';pn.append(h);
+for(const u in st.pl){const q=st.pl[u],d=document.createElement('div');d.className='pl';d.append(fl(q.c),`${q.n}${u==uid?' (вы)':''} · 🏰${st.b.filter(b=>b.o==u&&b.t=='city').length} ⚔${st.a.filter(a=>a.o==u).reduce((s,a)=>s+a.n,0)}`);
+if(u!=uid){const w=p.war[u],b=document.createElement('button');b.textContent=w?'⚔ война':'Объявить войну';b.disabled=!!w;b.onclick=()=>send({t:'war',p:u});d.append(b)}pn.append(d)}}
+(async()=>{try{const cl=window.claude;db=cl&&await cl.use('db');const us=cl&&await cl.use('user');uid=us&&await us.id();
+if(!db||!uid){$('#boot').textContent='Для мультиплеера откройте страницу в claude.ai (нужен вход).';return}
+$('#boot').textContent='Назовите страну, выберите флаг и создайте игру или войдите в существующую.';col=db.collection('game');col.onSnapshot(onSnap,e=>$('#boot').textContent='Ошибка: '+e.message)}catch(e){$('#boot').textContent='Ошибка: '+e.message}})();
+</script></body></html>
